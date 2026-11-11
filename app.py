@@ -25,9 +25,20 @@ from typing import Optional
 import gradio as gr
 
 from pii_poc.llm import LLMConfigError, get_icf_feedback
-from pii_poc.redactor import RedactionResult, SENSITIVE_TOPIC_ENTITIES, redact
+from pii_poc.redactor import (
+    RedactionResult,
+    SENSITIVE_TOPIC_ENTITIES,
+    redact,
+    warmup,
+)
 from pii_poc.rehydrate import rehydrate
 from pii_poc.samples import load_sample
+
+# Load the analyzer at import time so Hugging Face Spaces (or any host)
+# pays the ~10s spaCy + GLiNER load during startup, not on the first
+# user click. Safe to call at module scope — `warmup()` is idempotent
+# (second call hits the module-level cache).
+warmup()
 
 
 _SAMPLES_DIR = Path(__file__).parent / "samples"
@@ -400,5 +411,9 @@ def build_app() -> gr.Blocks:
     return app
 
 
+demo = build_app()
+
 if __name__ == "__main__":
-    build_app().launch(theme=SOFT_THEME, inbrowser=False)
+    # Plain launch — Hugging Face Spaces supplies the server host and port.
+    # Theme stays as a styling kwarg (not a hosting kwarg).
+    demo.launch(theme=SOFT_THEME)

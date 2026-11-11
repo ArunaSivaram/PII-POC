@@ -154,6 +154,17 @@ def _get_analyzer():
     return _ANALYZER
 
 
+def warmup() -> None:
+    """Force the analyzer to load now.
+
+    Call this at app startup (e.g. in `app.py`) so the first user click
+    doesn't pay the ~10s spaCy + GLiNER load cost. On Hugging Face
+    Spaces this means the "Building" phase covers the model download
+    instead of the user's first interaction.
+    """
+    _get_analyzer()
+
+
 def _name_spans(text: str, name: str, label: str) -> list[DetectedSpan]:
     """Find every mention of `name`, case-insensitive.
 
