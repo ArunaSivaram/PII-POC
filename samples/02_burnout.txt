@@ -1,0 +1,89 @@
+# coach: Suresh Nair | client: Arjun Krishnan
+
+[00:00] COACH: Arjun, good morning. How are you arriving today?
+[00:15] CLIENT: Tired. I had two hours of sleep.
+[00:30] COACH: Mm. Before we start — what would make this hour useful, given how you're feeling?
+[00:55] CLIENT: I need to figure out whether I can keep going for another six months. The move is in July.
+[01:20] COACH: The move to Bangalore?
+[01:30] CLIENT: Yes. The Singapore side is a mess — I spent an hour last night trying to upload my Aadhaar, 2341 2341 2346, to the housing portal in Bangalore, and it kept timing out. The landlord there, the visa stuff — and my work hasn't slowed down at all.
+[02:10] COACH: So you'd like to leave today with a sense of whether six more months is sustainable, and what has to change if it is.
+[02:35] CLIENT: Yes.
+[02:45] COACH: Shall we agree I'll ask some uncomfortable questions along the way?
+[03:00] CLIENT: Please.
+[03:10] COACH: Tell me what a normal day looks like right now.
+[03:25] CLIENT: Wake at 6. Check Slack from Rahul — he messages at 11pm his time, which is 1:30am mine. Deal with whatever's on fire before the gym.
+[04:00] COACH: Rahul is —
+[04:05] CLIENT: Rahul Mehta, our CEO at Spectra Technologies. He's based in Palo Alto.
+[04:25] COACH: And after the gym?
+[04:35] CLIENT: Showers, into the office by 8:30. Back-to-back calls until 12:30. Lunch meetings. Afternoons are shipping work and interviews.
+[05:10] COACH: Is there a time in that day you rest?
+[05:25] CLIENT: Not really. I eat at my desk. I take a ten-minute walk at 3 if I remember.
+[05:50] COACH: Evenings?
+[06:00] CLIENT: Home around 8. Maybe dinner. Back online by 9:30 because US east coast is awake. I try to log off by 11 but usually it's 1am.
+[06:35] COACH: On a scale of 1 to 10, how are you right now?
+[06:50] CLIENT: Four. Maybe three.
+[07:05] COACH: And six months ago?
+[07:15] CLIENT: Seven.
+[07:25] COACH: What's happened?
+[07:40] CLIENT: Series C closed in November. I was promoted. Scope doubled. The team doubled. Rahul's expectations tripled.
+[08:15] COACH: What have you let go of in that time, personally?
+[08:35] CLIENT: Swimming. I used to do laps three mornings a week. I haven't been in the pool since December.
+[09:00] COACH: Anything else?
+[09:15] CLIENT: My parents. I used to call Amma on Sundays. Now it's maybe once a fortnight, and the calls are short.
+[09:45] COACH: How does it feel to hear yourself say that?
+[10:05] CLIENT: Not great.
+[10:20] COACH: You mentioned you had two hours of sleep. What's going on there?
+[10:40] CLIENT: I saw a doctor last week. She said what I've been describing is generalised anxiety, probably on top of pretty clear burnout.
+[11:10] COACH: That's a significant appointment. What did you do with that information?
+[11:35] CLIENT: Filed it. Haven't told anyone. Haven't started the medication she offered.
+[11:55] COACH: Filed it. Say more.
+[12:10] CLIENT: I don't want it in writing. If HR ever sees it in my insurance claims — I just don't want that complication.
+[12:40] COACH: What would be the cost of the information staying filed?
+[13:05] CLIENT: Probably that I don't actually deal with it.
+[13:25] COACH: What does "dealing with it" look like, in your head?
+[13:50] CLIENT: Taking the medication. Telling my wife Priya properly. Telling Rahul I need the US calls dialled back.
+[14:20] COACH: Which one is hardest?
+[14:30] CLIENT: Telling Rahul.
+[14:45] COACH: What makes it hardest?
+[15:05] CLIENT: He operates at one gear. I'm scared that asking to slow down reads as "can't hack it."
+[15:35] COACH: Is there anyone at Spectra who has had this conversation with him and come out okay?
+[16:00] CLIENT: Our COO, Maya. She told him last year she couldn't do the all-hands at midnight India time any more. He grumbled but changed it.
+[16:35] COACH: What did Maya have that you don't?
+[16:55] CLIENT: Nothing I can think of, actually. She just said it clearly.
+[17:15] COACH: Mm.
+[17:25] CLIENT: Yeah.
+[17:40] COACH: If you continue exactly as things are for six more months — what happens?
+[18:05] CLIENT: I either get through it and crash on the other side, or I don't get through it.
+[18:30] COACH: What does "don't get through it" look like?
+[18:50] CLIENT: A real health scare. Something that forces the issue.
+[19:15] COACH: Is that an acceptable outcome to you?
+[19:30] CLIENT: No.
+[19:45] COACH: So what's actually non-negotiable between now and July?
+[20:10] CLIENT: Sleep. Six hours minimum. That means no 1:30am Slack.
+[20:35] COACH: What else?
+[20:50] CLIENT: Starting the medication the doctor prescribed. That's a decision I can make without anyone's permission.
+[21:20] COACH: Yes. What else?
+[21:35] CLIENT: Telling Priya tonight. Properly. Not in a tired debrief at midnight.
+[22:00] COACH: And work?
+[22:15] CLIENT: One conversation with Rahul in the next two weeks. I don't need to fix everything — I need to name the problem.
+[22:45] COACH: What would you want from him?
+[23:05] CLIENT: Permission to shift the East Coast calls by a few hours. And acknowledgement that I can't keep adding scope without something coming off.
+[23:40] COACH: Priya, Rahul, doctor's medication, sleep. Four things. Which goes first?
+[24:05] CLIENT: Priya tonight. Then the medication tomorrow morning. Then Rahul in the next two weeks. Sleep starts tonight.
+[24:40] COACH: What might trip you up?
+[24:55] CLIENT: That I'll talk to Priya and it'll feel better and I won't do the rest.
+[25:20] COACH: What stops that?
+[25:35] CLIENT: Writing them down with dates. Telling you next session that I did them.
+[26:00] COACH: I'll ask. And Arjun — when you think about the move to Bangalore, what role does your health play in whether it works?
+[26:35] CLIENT: It's the whole thing. If I arrive like this, we haven't moved — we've relocated the problem.
+[27:00] COACH: Say that back to yourself.
+[27:10] CLIENT: If I arrive like this, we've just relocated the problem.
+[27:30] COACH: What does that make you want to do today?
+[27:50] CLIENT: Treat these four things as the actual move. Not the furniture.
+[28:15] COACH: One more question — how will you know this coaching is working?
+[28:40] CLIENT: When I stop needing a coach to tell me the obvious things.
+[29:00] COACH: Fair. And when you stop filing things.
+[29:10] CLIENT: Yes. When I stop filing things.
+[29:25] COACH: Good. Let's close there. Message me when the Priya conversation is done — even just one line.
+[29:45] CLIENT: Will do. Thanks, Suresh.
+[29:55] COACH: Take care, Arjun. Get some sleep.

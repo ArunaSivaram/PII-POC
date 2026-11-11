@@ -1,0 +1,95 @@
+# coach: Marcus Hale | client: Alex Carter
+
+[00:00] COACH: Alex, welcome back. What are we working on today?
+[00:15] CLIENT: The team restructure. I need to decide who moves where by Friday, and it's getting tangled.
+[00:40] COACH: What would a useful outcome look like for you in the next hour?
+[01:00] CLIENT: A clearer view of what's driving the tangling. And a decision on one of the hard ones.
+[01:25] COACH: Which hard one?
+[01:40] CLIENT: Whether to move Grace onto the platform team.
+[01:55] COACH: Tell me about Grace.
+[02:10] CLIENT: Grace Okonkwo. She's been on my team for three years. She's the person everyone goes to when they're stuck.
+[02:40] COACH: What makes you consider moving her?
+[02:55] CLIENT: The platform team is drowning. I need someone senior there who handles pressure with grace, no pun intended.
+[03:20] COACH: And what pulls against it?
+[03:40] CLIENT: Losing her centre-of-gravity effect on my own team. The place would feel less soft without her.
+[04:10] COACH: Soft in what way?
+[04:30] CLIENT: She brings a kind of stillness. When someone's panicking, she doesn't match their energy. She holds it.
+[05:00] COACH: You said "everyone goes to her when they're stuck." Who's "everyone"?
+[05:20] CLIENT: Will. Rose. Hope. My three senior engineers. The ones who'd be affected if Grace moved.
+[05:50] COACH: Tell me about Will.
+[06:00] CLIENT: Will Chen. He's my most ambitious — tightly wound. If Grace moves, Will will take it personally. He'll think I'm elevating her because I don't trust him.
+[06:35] COACH: Is there truth in that?
+[06:50] CLIENT: A sliver. I trust his output. I don't yet trust his judgement under pressure.
+[07:15] COACH: What would help you trust it?
+[07:35] CLIENT: Seeing him hold something hard without running to me every six hours.
+[08:00] COACH: And Rose and Hope — where are they in all this?
+[08:20] CLIENT: Rose is the opposite of Will. She under-asserts. I hope she'll push back when I announce this, but I don't think she will.
+[08:55] COACH: You hope she will. Is there a version of this where you create space for her to?
+[09:20] CLIENT: Maybe a one-on-one before the announcement. Let her react privately first.
+[09:45] COACH: And Hope?
+[09:55] CLIENT: Hope Alvaro. She's my newest senior. Six months in. I haven't earned enough trust for her to tell me honestly.
+[10:30] COACH: What would earning that trust look like?
+[10:50] CLIENT: Asking before deciding.
+[11:05] COACH: What stops you?
+[11:20] CLIENT: Time. The deadline from my boss is Friday.
+[11:35] COACH: Your boss has given you four days for a decision of this size.
+[11:50] CLIENT: That's how Horizon Partners operates. Fast. Sometimes too fast.
+[12:15] COACH: What would it cost to push back on the Friday?
+[12:35] CLIENT: Credibility, maybe. Or maybe nothing. My boss likes decisiveness, but she also likes reasoned pushback. I just haven't tried it on this one.
+[13:10] COACH: What's stopping you from trying?
+[13:30] CLIENT: Honestly, I rose into this role on the back of being the person who doesn't push back. I built my reputation on delivery, not on friction.
+[14:05] COACH: And now that reputation is in your way.
+[14:20] CLIENT: Yes.
+[14:30] COACH: What does that reputation cost the people around you?
+[14:50] CLIENT: They inherit the compression. I take the deadline, I squeeze it down to them, and they scramble.
+[15:20] COACH: So one option is pushing back on the Friday. What's another?
+[15:45] CLIENT: Running the decision in public. Being honest with the team that it's a hard call and I want their input before I close it.
+[16:15] COACH: What happens if you do that?
+[16:30] CLIENT: Will might read it as weakness. Grace will take on half the emotional work of the room. Rose will go quiet. Hope — I don't know.
+[17:00] COACH: Which of those actually stops you?
+[17:15] CLIENT: Honestly? Grace taking on the emotional work. I owe her better than that.
+[17:40] COACH: What would be better than that?
+[18:00] CLIENT: Me holding the hard space myself. Not outsourcing it to the most emotionally capable person in the room.
+[18:30] COACH: Say more.
+[18:45] CLIENT: I've been relying on Grace's gravity to steady my team. But that's not her job. That's mine.
+[19:15] COACH: What shifts for you when you say that?
+[19:35] CLIENT: The decision shifts. If I move Grace, it's because the platform team needs her — not because I want to keep leaning on her here.
+[20:05] COACH: And how does that sit?
+[20:20] CLIENT: Cleaner. Harder.
+[20:35] COACH: What's harder about it?
+[20:50] CLIENT: I have to actually show up as the one who holds the room. And I haven't been.
+[21:15] COACH: When was the last time you did?
+[21:30] CLIENT: During the outage in March. I hope I rose to it then. People said I did.
+[21:55] COACH: You said "I hope." What if we removed the hedge?
+[22:15] CLIENT: I rose to it in March.
+[22:30] COACH: Yes. What was different in you that day?
+[22:50] CLIENT: I'd stopped performing calm and actually was calm. The stakes were too high for the performance.
+[23:20] COACH: The performance drops off when the stakes go up.
+[23:40] CLIENT: Yeah.
+[23:55] COACH: What's possible if you run this restructure the way you ran March?
+[24:15] CLIENT: I slow down the loop. I'm honest that I'm thinking out loud. People push back without pretending they agree.
+[24:50] COACH: What's the first move, then?
+[25:10] CLIENT: Email my boss tonight. Ask for Tuesday instead of Friday. One sentence of reasoning.
+[25:40] COACH: What's next?
+[25:55] CLIENT: Talk to Grace first. Before anyone else. Ask her what she wants. I've been so busy weighing what I want for her that I haven't asked.
+[26:30] COACH: And then?
+[26:45] CLIENT: One-on-ones with Will, Rose, Hope. Not to announce. To think with them.
+[27:15] COACH: When?
+[27:25] CLIENT: Tomorrow and Wednesday. Thirty minutes each.
+[27:45] COACH: What might trip you up?
+[28:05] CLIENT: Will turning it into a lobbying session. Rose being too quiet for me to actually hear her. Hope deferring to whatever I seem to want.
+[28:40] COACH: How will you handle each?
+[29:05] CLIENT: With Will, I'll be clear up front that it's not a decision call. With Rose, I'll ask one specific question and then shut up. With Hope — I don't know yet.
+[29:40] COACH: What would be useful to figure out about Hope before Wednesday?
+[30:05] CLIENT: How she signals disagreement. I've never seen it.
+[30:30] COACH: Any sense of how you could learn that?
+[30:50] CLIENT: Ask her directly. "How will I know when you disagree with me?"
+[31:15] COACH: Alex, what are you taking from today?
+[31:40] CLIENT: Three things. One: my boss's deadline isn't the law. Two: I've been using Grace as scaffolding for a steadiness that should be mine. Three: Hope needs me to ask her a specific question.
+[32:20] COACH: And the original decision you came in to make?
+[32:40] CLIENT: Grace to the platform team. Yes. Because the platform team needs her, and because my team needs me to grow into her role.
+[33:15] COACH: Confidence level?
+[33:25] CLIENT: Seven. I'll know for sure after I speak with Grace.
+[33:45] COACH: Good. Message me after that conversation.
+[34:00] CLIENT: Will do. Thanks, Marcus.
+[34:10] COACH: Take care, Alex.

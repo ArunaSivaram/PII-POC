@@ -1,0 +1,17 @@
+[project]
+name = "pii-poc"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "en-core-web-sm",
+    "gliner>=0.2.30",
+    "google-genai>=3.0.0",
+    "gradio>=6.31.0",
+    "presidio-analyzer[gliner]>=2.2.366",
+    "presidio-anonymizer>=2.2.366",
+    "pytest>=9.2.0",
+    "python-dotenv>=1.2.4",
+]
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }

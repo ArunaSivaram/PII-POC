@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# uv / Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Model & tokenizer caches (GLiNER / HF / spaCy download large files)
+.cache/
+.hf_cache/
+~/.cache/huggingface/
+huggingface/
+models/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
