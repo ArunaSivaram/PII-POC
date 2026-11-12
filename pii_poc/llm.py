@@ -1,11 +1,15 @@
-"""Thin Gemini wrapper for the ICF-feedback call.
+"""Gemini wrapper for the ICF-feedback call.
 
-Reads `GEMINI_API_KEY` and `GEMINI_MODEL` from env (set in `.env`). The
-app catches `LLMConfigError` and renders a clean message in the UI
-rather than letting the API crash take the server down.
+Reads `GEMINI_API_KEY` and `GEMINI_MODEL` from env (set in `.env` or on
+the deployment host). The app catches `LLMConfigError` and renders a
+clean UI message rather than crashing.
 
-Returns `(text, usage)` where `usage` is a small dataclass with token
-counts and a cost estimate in USD.
+Returns `(SessionReport, Usage)`:
+  * `SessionReport` — our stable internal shape (see `pii_poc.report`).
+    Populated from Gemini's JSON reply via `from_poc_feedback`. When
+    parsing fails, structured fields are empty but `raw_text` still
+    carries Gemini's exact output.
+  * `Usage` — token counts + USD cost estimate for the call.
 """
 
 from __future__ import annotations
@@ -14,29 +18,65 @@ import os
 from dataclasses import dataclass
 
 from google import genai
+from google.genai import types
+
+from pii_poc.report import SessionReport, from_poc_feedback
 
 
-# The user-provided prompt, kept verbatim so it's easy to tweak later.
+# The prompt asks Gemini for a single JSON object matching the
+# SessionReport / CompetencyResult / Evidence dataclasses. Response MIME
+# type is also pinned to application/json in the request config.
 _PROMPT = (
-    "You are reviewing a coaching session against ICF Core Competencies. "
-    "Personal details have been replaced with placeholders such as "
-    "[COACH_NAME], [CLIENT_NAME], [PERSON_1], [ORG_1]; treat each as a "
-    "consistent real person or organisation. "
-    "Refer to this session's coach as [COACH_NAME] and this session's "
-    "client as [CLIENT_NAME] throughout your feedback — do not write "
-    "'the coach' or 'the client' when you mean these specific people. "
-    "When referencing anyone or anything else from the transcript, cite "
-    "them by their exact placeholder (e.g. [PERSON_3], [ORG_1]), "
-    "including the square brackets. "
-    "Always keep placeholders exactly as written. "
-    "Give 3 concise feedback points for [COACH_NAME], each naming the "
-    "ICF competency and quoting one line of evidence from the transcript "
-    "(copy the line verbatim, including any placeholders)."
+    "You are reviewing a coaching session against the eight ICF Core "
+    "Competencies:\n"
+    "  1. Demonstrates Ethical Practice\n"
+    "  2. Embodies a Coaching Mindset\n"
+    "  3. Establishes and Maintains Agreements\n"
+    "  4. Cultivates Trust and Safety\n"
+    "  5. Maintains Presence\n"
+    "  6. Listens Actively\n"
+    "  7. Evokes Awareness\n"
+    "  8. Facilitates Client Growth\n\n"
+    "Personal details in the transcript have been replaced with "
+    "placeholders such as [COACH_NAME], [CLIENT_NAME], [PERSON_1], "
+    "[ORG_1]. Treat each as a consistent real person or organisation. "
+    "Refer to this session's coach as [COACH_NAME] and the client as "
+    "[CLIENT_NAME]. When referencing anyone or anything else from the "
+    "transcript, cite them by their exact placeholder (e.g. [PERSON_3], "
+    "[ORG_1]). Always keep placeholders exactly as written, including "
+    "the square brackets.\n\n"
+    "Return a single JSON object with this exact shape and keys — no "
+    "prose, no markdown fences, nothing before or after:\n\n"
+    "{\n"
+    '  "overall_summary": "2-3 sentence overview of the whole session",\n'
+    '  "competencies": [\n'
+    "    {\n"
+    '      "competency": "<one of the 8 competency names above>",\n'
+    '      "score_or_level": "<Not evident | Developing | ACC | PCC | MCC>",\n'
+    '      "summary": "<one-line observation>",\n'
+    '      "strengths": [\n'
+    '        {"timestamp": "MM:SS",\n'
+    '         "quote": "<transcript line verbatim, including any placeholders>",\n'
+    '         "note": "<what this demonstrates>"}\n'
+    "      ],\n"
+    '      "development_areas": [\n'
+    '        {"timestamp": "MM:SS", "quote": "...", "note": "..."}\n'
+    "      ],\n"
+    '      "pcc_markers_observed": ["<short phrase>", "..."],\n'
+    '      "pcc_markers_missed":  ["<short phrase>", "..."]\n'
+    "    }\n"
+    "  ],\n"
+    '  "next_steps": ["<action 1>", "<action 2>", "<action 3>"]\n'
+    "}\n\n"
+    "Include an entry for all 8 competencies, in the order listed. "
+    "Provide 1-2 evidence items per competency combined across "
+    "strengths and development_areas. Quote transcript lines verbatim "
+    "(keep placeholders intact). Keep summaries and notes concise."
 )
 
 # Default per-1M-token prices for Gemini 3.8 Flash (introductory rate
-# effective until 2026-12-31 — per Google's pricing page). After that date
-# the standard rate is 1.50 / 7.50. Override any of these via `.env`:
+# through 2026-12-31). After that, standard rates are 1.50 / 7.50.
+# Override any of these via `.env`:
 #   GEMINI_PRICE_INPUT_PER_1M, GEMINI_PRICE_OUTPUT_PER_1M,
 #   GEMINI_PRICE_CACHED_INPUT_PER_1M
 _DEFAULT_PRICE_INPUT = 0.75
@@ -50,13 +90,19 @@ class LLMConfigError(Exception):
 
 @dataclass
 class Usage:
-    """Token counts + computed USD cost for one Gemini call."""
-    prompt_tokens: int       # tokens in the request
-    cached_tokens: int       # subset of prompt tokens billed at the cache rate
-    output_tokens: int       # tokens in the reply (incl. hidden thinking tokens)
-    total_tokens: int        # prompt + output, as Gemini reports it
-    cost_usd: float          # USD at the configured per-1M-token rates
-    model: str               # the model name used
+    """Token counts + computed USD cost for one Gemini call.
+
+    `output_tokens` is the visible candidates tokens; `thinking_tokens`
+    is the separate "thoughts" count (billed at the output rate). UI
+    layers that want to show them combined should sum the two.
+    """
+    prompt_tokens: int
+    cached_tokens: int
+    output_tokens: int
+    thinking_tokens: int
+    total_tokens: int
+    cost_usd: float
+    model: str
 
 
 def _price(env_var: str, default: float) -> float:
@@ -74,35 +120,41 @@ def _usage_from(response, model: str) -> Usage:
     cached = int(getattr(meta, "cached_content_token_count", 0) or 0)
     total = int(getattr(meta, "total_token_count", 0) or 0)
 
-    output = candidates + thoughts  # thinking tokens are billed at the output rate
+    billable_output = candidates + thoughts  # thinking tokens billed at output rate
 
     price_in = _price("GEMINI_PRICE_INPUT_PER_1M", _DEFAULT_PRICE_INPUT)
     price_out = _price("GEMINI_PRICE_OUTPUT_PER_1M", _DEFAULT_PRICE_OUTPUT)
-    price_cached = _price("GEMINI_PRICE_CACHED_INPUT_PER_1M", _DEFAULT_PRICE_CACHED_INPUT)
+    price_cached = _price(
+        "GEMINI_PRICE_CACHED_INPUT_PER_1M", _DEFAULT_PRICE_CACHED_INPUT
+    )
 
     uncached_input = max(0, prompt - cached)
     cost = (
         uncached_input * price_in
         + cached * price_cached
-        + output * price_out
+        + billable_output * price_out
     ) / 1_000_000.0
 
     return Usage(
         prompt_tokens=prompt,
         cached_tokens=cached,
-        output_tokens=output,
-        total_tokens=total or (prompt + output),
+        output_tokens=candidates,
+        thinking_tokens=thoughts,
+        total_tokens=total or (prompt + billable_output),
         cost_usd=cost,
         model=model,
     )
 
 
-def get_icf_feedback(redacted_text: str) -> tuple[str, Usage]:
-    """Send `redacted_text` to Gemini and return (reply_text, usage).
+def get_icf_feedback(redacted_text: str) -> tuple[SessionReport, Usage]:
+    """Send `redacted_text` to Gemini and return (SessionReport, Usage).
 
     Raises `LLMConfigError` if the API key is missing. Other exceptions
     (network, quota, bad model name, etc.) propagate so the caller can
     render them.
+
+    On a parse failure, the returned `SessionReport` has empty
+    structured fields and `raw_text` carrying Gemini's literal reply.
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -117,6 +169,10 @@ def get_icf_feedback(redacted_text: str) -> tuple[str, Usage]:
     response = client.models.generate_content(
         model=model,
         contents=f"{_PROMPT}\n\n--- Transcript ---\n{redacted_text}",
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+        ),
     )
-    text = response.text or "(The model returned an empty response.)"
-    return text, _usage_from(response, model)
+    text = response.text or "{}"
+    report = from_poc_feedback(text)
+    return report, _usage_from(response, model)

@@ -1,13 +1,18 @@
 """CoachBetter — Privacy Shield (proof of concept).
 
-Minimal Gradio UI for the PII redaction demo. Two tabs:
-  * Redact     — load/paste a transcript, highlight detected PII by type,
-                 show a redacted version and a mapping table.
-  * Rehydrate  — (placeholder for the next step).
+Three-tab Gradio UI for the PII redaction demo.
+  * Redact        — load/paste a transcript, highlight detected PII by
+                    type, produce the redacted version + mapping table.
+  * Send to AI    — show the redacted text, call Gemini for ICF
+                    feedback, display tokens/cost, render raw vs
+                    rehydrated panels.
+  * Talk it through — chat with an AI mentor or peer about the session,
+                    using the redacted transcript + the SessionReport
+                    from the previous tabs.
 
 Guarantees:
-  * `.env` loads before gradio/gliner are imported so their telemetry-off
-    flags take effect.
+  * `.env` loads before gradio/gliner are imported so their telemetry-
+    off flags take effect.
   * The transcript is only ever displayed inside the UI widgets; nothing
     is printed to stdout or written to a log.
 """
@@ -19,11 +24,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
+import re
 from pathlib import Path
 from typing import Optional
 
 import gradio as gr
 
+from pii_poc.chat import ChatContext, ChatSession, suggest_starters
 from pii_poc.llm import LLMConfigError, get_icf_feedback
 from pii_poc.redactor import (
     RedactionResult,
@@ -32,6 +40,7 @@ from pii_poc.redactor import (
     warmup,
 )
 from pii_poc.rehydrate import rehydrate
+from pii_poc.report import SessionReport, to_prompt_text
 from pii_poc.samples import load_sample
 
 # Load the analyzer at import time so Hugging Face Spaces (or any host)
@@ -187,10 +196,11 @@ def _on_redact(
             [],
             "_Paste or load a transcript first._",
             None,
-            "",  # Tab 2 preview
-            "",  # Tab 2 usage
-            "",  # Tab 2 raw output
-            "",  # Tab 2 rehydrated output
+            "",    # Tab 2 preview
+            "",    # Tab 2 usage
+            "",    # Tab 2 raw output
+            "",    # Tab 2 rehydrated output
+            None,  # Tab 2 report state (SessionReport)
         )
 
     mode = mode_label.lower()
@@ -227,6 +237,7 @@ def _on_redact(
         "",                    # Tab 2 usage (cleared)
         "",                    # Tab 2 raw output (cleared)
         "",                    # Tab 2 rehydrated output (cleared)
+        None,                  # Tab 2 report state (cleared)
     )
 
 
@@ -240,27 +251,346 @@ def _format_usage(u) -> str:
     )
 
 
+def _render_report(report: SessionReport) -> str:
+    """Pick the best display text for a SessionReport.
+
+    If the structured fields came back, render via `to_prompt_text` so
+    the user sees the organised view. Otherwise fall back to the raw
+    Gemini reply (so a parse failure stays visible / debuggable instead
+    of showing an empty panel).
+    """
+    if report.competencies or report.overall_summary or report.next_steps:
+        return to_prompt_text(report)
+    return report.raw_text or "_(Gemini returned an empty response.)_"
+
+
 def _on_llm_click(state):
-    """Tab 2 button: send redacted text to Gemini, show usage + raw + rehydrated."""
+    """Tab 2 button: send redacted text to Gemini, show usage + raw + rehydrated.
+
+    Returns a tuple that matches `outputs=[usage_md, raw_out,
+    rehydrated_out, report_state]`. Placeholders stay intact in the
+    report object (and in the left panel); only the right panel is
+    rehydrated to real names.
+    """
     if state is None or not getattr(state, "redacted_text", "").strip():
-        msg = "**Run tab 1 first.** Redact a transcript on the Redact tab, then come back here."
-        return "", msg, msg
+        msg = (
+            "**Run tab 1 first.** Redact a transcript on the Redact tab, "
+            "then come back here."
+        )
+        return "", msg, msg, None
 
     try:
-        raw, usage = get_icf_feedback(state.redacted_text)
+        report, usage = get_icf_feedback(state.redacted_text)
     except LLMConfigError as e:
         msg = (
             "**Can't call Gemini yet.**\n\n"
             f"{e}\n\n"
             "Then restart the app."
         )
-        return "", msg, msg
+        return "", msg, msg, None
     except Exception as e:  # network / quota / bad model name
         msg = f"**Gemini request failed:** `{type(e).__name__}` — {e}"
-        return "", msg, msg
+        return "", msg, msg, None
 
-    rehydrated = rehydrate(raw, state.mapping)
-    return _format_usage(usage), raw, rehydrated
+    display = _render_report(report)
+    rehydrated = rehydrate(display, state.mapping)
+    return _format_usage(usage), display, rehydrated, report
+
+
+# ======================================================================
+# Tab 3 — "Talk it through"
+# ======================================================================
+
+_PERSONA_DESCRIPTIONS: dict[str, str] = {
+    "Mentor coach": (
+        "_Direct, evidence-based feedback against the ICF competencies, "
+        "with lines you could try._"
+    ),
+    "Peer coach": (
+        "_A fellow coach reflecting with you: curious, collegial, "
+        "fewer verdicts._"
+    ),
+}
+
+
+def _persona_key(label: str) -> str:
+    """Map the radio label to the ChatSession persona key."""
+    return "peer" if label == "Peer coach" else "mentor"
+
+
+def _persona_desc(label: str) -> str:
+    return _PERSONA_DESCRIPTIONS.get(label, "")
+
+
+def _default_cap() -> int:
+    try:
+        return max(1, int(os.environ.get("CHAT_MAX_QUESTIONS", "50")))
+    except ValueError:
+        return 50
+
+
+def _counter_text(session) -> str:
+    """Return the 'Questions left: X / N' line."""
+    if session is None:
+        cap = _default_cap()
+        return f"Questions left: **{cap}** / {cap}"
+    return f"Questions left: **{session.questions_left}** / {session.questions_cap}"
+
+
+def _format_chat_usage(turn, session) -> str:
+    """Markdown block for the Usage accordion on tab 3."""
+    u = turn.usage
+    return (
+        f"**Last message**  \n"
+        f"Input: {u.prompt_tokens:,} ({u.cached_tokens:,} cached)  \n"
+        f"Output: {u.output_tokens:,} ({u.thinking_tokens:,} thinking)  \n"
+        f"Cost: ${u.cost_usd:.4f}\n\n"
+        f"**This session**  \n"
+        f"Total cost: ${session.total_cost_usd:.4f} "
+        f"across {session.questions_used} question"
+        f"{'s' if session.questions_used != 1 else ''}."
+    )
+
+
+_COACH_TURN_RE = re.compile(
+    r"\[(\d\d:\d\d)\]\s*COACH:\s*(.+?)(?=\n\[\d\d:\d\d\]|\Z)",
+    re.DOTALL,
+)
+
+
+def _coach_turns_from_transcript(
+    text: str, max_chars: int = 80
+) -> tuple[list[str], dict[str, tuple[str, str]]]:
+    """Parse the ORIGINAL transcript into dropdown choices + a lookup.
+
+    Returns `(choices, lookup)` where each choice is a display string
+    like `[02:41] What does that number mean to you?` and the lookup
+    maps the display back to `(timestamp, full_quote)` so the moment-
+    select handler can build the fill-in template.
+    """
+    choices: list[str] = []
+    lookup: dict[str, tuple[str, str]] = {}
+    for m in _COACH_TURN_RE.finditer(text or ""):
+        ts = m.group(1)
+        quote = m.group(2).strip().replace("\n", " ")
+        truncated = quote[:max_chars] + ("…" if len(quote) > max_chars else "")
+        display = f"[{ts}] {truncated}"
+        # Guard against duplicate display strings (rare) so dict keys stay unique.
+        if display in lookup:
+            display = f"{display} ({len(lookup)})"
+        choices.append(display)
+        lookup[display] = (ts, quote)
+    return choices, lookup
+
+
+def _readiness_update(red_state, rep_state):
+    """Show or hide the 'run tabs 1 and 2 first' banner based on state."""
+    if red_state is None or rep_state is None:
+        return gr.update(
+            value=(
+                "_Redact a transcript and generate feedback first "
+                "(tabs 1 and 2)._"
+            ),
+            visible=True,
+        )
+    return gr.update(visible=False)
+
+
+# ---- send pipeline (shared by Send button, Enter, and starter clicks) ----
+
+_NOT_READY = (
+    "**Please run tab 1 (Redact) and tab 2 (Send to AI) first.** "
+    "I need a redacted transcript and the ICF feedback report to talk about."
+)
+
+
+def _on_send_core(
+    msg: str,
+    chat_history,
+    chat_sess,
+    redaction,
+    report,
+    coach_name: str,
+    client_name: str,
+    persona_label: str,
+):
+    """Shared send logic — returns 7 values (no msg_input in this list).
+
+    Order:
+      chat_history, chat_sess, counter_text,
+      ai_sent_md, ai_raw_md, usage_md, persona_notice_update
+    """
+    chat_history = list(chat_history or [])
+
+    if not msg.strip():
+        return (
+            chat_history, chat_sess,
+            _counter_text(chat_sess),
+            gr.update(), gr.update(), gr.update(),
+            gr.update(visible=False),
+        )
+
+    if redaction is None or report is None:
+        chat_history.append({"role": "user", "content": msg})
+        chat_history.append({"role": "assistant", "content": _NOT_READY})
+        return (
+            chat_history, chat_sess,
+            _counter_text(chat_sess),
+            gr.update(), gr.update(), gr.update(),
+            gr.update(visible=False),
+        )
+
+    persona_key = _persona_key(persona_label)
+    if chat_sess is None:
+        ctx = ChatContext(
+            redacted_transcript=redaction.redacted_text,
+            report=report,
+            mapping=redaction.mapping,
+            coach_name=coach_name or "",
+            client_name=client_name or "",
+        )
+        chat_sess = ChatSession(ctx, persona=persona_key)
+    elif chat_sess.persona != persona_key:
+        chat_sess.set_persona(persona_key)
+
+    try:
+        turn = chat_sess.ask(msg)
+    except LLMConfigError as e:
+        chat_history.append({"role": "user", "content": msg})
+        chat_history.append({
+            "role": "assistant",
+            "content": f"**Can't call Gemini.**\n\n{e}",
+        })
+        return (
+            chat_history, chat_sess,
+            _counter_text(chat_sess),
+            gr.update(), gr.update(), gr.update(),
+            gr.update(visible=False),
+        )
+    except Exception as e:
+        chat_history.append({"role": "user", "content": msg})
+        chat_history.append({
+            "role": "assistant",
+            "content": f"**Gemini request failed:** `{type(e).__name__}` — {e}",
+        })
+        return (
+            chat_history, chat_sess,
+            _counter_text(chat_sess),
+            gr.update(), gr.update(), gr.update(),
+            gr.update(visible=False),
+        )
+
+    chat_history.append({"role": "user", "content": msg})
+    chat_history.append({"role": "assistant", "content": turn.reply_shown})
+
+    # When the cap is hit, ChatSession.ask returns an empty message_sent
+    # and a friendly reply; leave the right-column accordions as-is.
+    if turn.message_sent:
+        ai_sent = f"```\n{turn.message_sent}\n```"
+        ai_raw = turn.reply_raw
+        usage_md = _format_chat_usage(turn, chat_sess)
+    else:
+        ai_sent = gr.update()
+        ai_raw = gr.update()
+        usage_md = gr.update()
+
+    return (
+        chat_history, chat_sess,
+        _counter_text(chat_sess),
+        ai_sent, ai_raw, usage_md,
+        gr.update(visible=False),
+    )
+
+
+def _on_send_from_input(msg, *args):
+    """Send button / Enter: clear the input textbox after sending."""
+    hist, sess, counter, ai_sent, ai_raw, usage, notice = _on_send_core(msg, *args)
+    return hist, sess, "", counter, ai_sent, ai_raw, usage, notice
+
+
+def _on_send_from_starter(msg, *args):
+    """Starter click: don't touch the input textbox (preserve any draft)."""
+    hist, sess, counter, ai_sent, ai_raw, usage, notice = _on_send_core(msg, *args)
+    return hist, sess, gr.update(), counter, ai_sent, ai_raw, usage, notice
+
+
+def _make_starter_handler(idx: int):
+    """Produce a per-button click handler that reads its starter text from state."""
+    def handler(starters, *args):
+        msg = starters[idx] if 0 <= idx < len(starters) else ""
+        return _on_send_from_starter(msg, *args)
+    return handler
+
+
+def _on_moment_select(display, lookup):
+    """Fill the msg_input with the 'How did I do at …' template."""
+    if not display or not lookup or display not in lookup:
+        return gr.update()
+    ts, quote = lookup[display]
+    return f'How did I do at [{ts}] when I said "{quote}"?'
+
+
+def _on_persona_change(new_label, chat_sess):
+    """Persona switch — if a session exists, start fresh conversation."""
+    desc = _persona_desc(new_label)
+    if chat_sess is None:
+        # Nothing to reset yet — just update the description.
+        return (
+            desc,
+            gr.update(visible=False),
+            gr.update(),  # chat_display unchanged
+            None,
+            gr.update(),  # counter unchanged
+        )
+    chat_sess.set_persona(_persona_key(new_label))
+    notice = f"_Switched to {new_label} — fresh conversation._"
+    return (
+        desc,
+        gr.update(value=notice, visible=True),
+        [],  # clear chat_display
+        chat_sess,
+        _counter_text(chat_sess),
+    )
+
+
+def _on_chat_reset():
+    """Full reset of the chat tab's visible state."""
+    return (
+        [],                                         # chat_display
+        None,                                       # chat_sess
+        "",                                         # msg_input
+        _counter_text(None),                        # counter
+        "_No message sent yet._",                   # ai_sent
+        "_No reply received yet._",                 # ai_raw
+        "_No usage yet._",                          # usage
+        gr.update(visible=False),                   # persona_notice
+    )
+
+
+def _populate_moments(transcript):
+    """Build the moment-dropdown choices from the current transcript."""
+    choices, lookup = _coach_turns_from_transcript(transcript or "")
+    return (
+        gr.update(choices=choices, value=None),
+        lookup,
+    )
+
+
+def _populate_starters(report):
+    """Build the 6 starter-button updates from the current SessionReport."""
+    if report is None:
+        empties = [gr.update(value="", visible=False) for _ in range(6)]
+        return (*empties, [""] * 6)
+    starters = suggest_starters(report)
+    # Pad to exactly 6 if the dynamic helper returned fewer (e.g. no report).
+    while len(starters) < 6:
+        starters.append("")
+    starters = starters[:6]
+    updates = [
+        gr.update(value=s, visible=bool(s))
+        for s in starters
+    ]
+    return (*updates, starters)
 
 
 # ----------------------------------------------------------------------
@@ -276,8 +606,17 @@ SOFT_THEME = gr.themes.Soft(
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="CoachBetter — Privacy Shield") as app:
 
-        # Cross-tab state. Populated on every Redact click.
+        # Cross-tab state.
+        # `state`              — RedactionResult from Tab 1
+        # `report_state`       — SessionReport from Tab 2
+        # `chat_state`         — the live ChatSession (Tab 3)
+        # `moment_lookup`      — {display -> (timestamp, quote)} for the moment dropdown
+        # `starters_state`     — the 6 starter strings suggest_starters() produced
         state = gr.State(None)
+        report_state = gr.State(None)
+        chat_state = gr.State(None)
+        moment_lookup = gr.State({})
+        starters_state = gr.State([""] * 6)
 
         gr.Markdown("# CoachBetter — Privacy Shield (proof of concept)")
 
@@ -374,6 +713,86 @@ def build_app() -> gr.Blocks:
                         gr.Markdown("**What the coach sees** (rehydrated to real names)")
                         rehydrated_out = gr.Markdown("")
 
+            # ---------- Talk it through tab ----------
+            with gr.Tab("Talk it through"):
+                readiness_md = gr.Markdown(
+                    "_Redact a transcript and generate feedback first "
+                    "(tabs 1 and 2)._",
+                    visible=True,
+                )
+
+                with gr.Row():
+                    persona = gr.Radio(
+                        choices=["Mentor coach", "Peer coach"],
+                        value="Mentor coach",
+                        label="Persona",
+                    )
+                persona_desc_md = gr.Markdown(
+                    _PERSONA_DESCRIPTIONS["Mentor coach"]
+                )
+                persona_notice_md = gr.Markdown("", visible=False)
+
+                with gr.Row():
+                    # ---- LEFT: conversation + input + starters + moment ----
+                    with gr.Column(scale=3):
+                        chat_display = gr.Chatbot(
+                            height=420,
+                            show_label=False,
+                            value=[],
+                        )
+                        with gr.Row():
+                            msg_input = gr.Textbox(
+                                show_label=False,
+                                placeholder=(
+                                    "Ask about a moment, a competency, "
+                                    "or what to try next..."
+                                ),
+                                scale=5,
+                                lines=2,
+                                max_lines=6,
+                            )
+                            send_btn = gr.Button(
+                                "Send", variant="primary", scale=1,
+                            )
+                        counter_md = gr.Markdown(_counter_text(None))
+
+                        gr.Markdown("**Starter questions**")
+                        with gr.Row():
+                            s_btn1 = gr.Button("", visible=False, size="sm")
+                            s_btn2 = gr.Button("", visible=False, size="sm")
+                            s_btn3 = gr.Button("", visible=False, size="sm")
+                        with gr.Row():
+                            s_btn4 = gr.Button("", visible=False, size="sm")
+                            s_btn5 = gr.Button("", visible=False, size="sm")
+                            s_btn6 = gr.Button("", visible=False, size="sm")
+                        starter_btns = [
+                            s_btn1, s_btn2, s_btn3, s_btn4, s_btn5, s_btn6,
+                        ]
+
+                        gr.Markdown("**Ask about a moment**")
+                        moment_dd = gr.Dropdown(
+                            choices=[],
+                            label="Coach turns from the transcript",
+                            interactive=True,
+                            info=(
+                                "Pick one and it fills the box with a "
+                                '"How did I do at…" question you can edit.'
+                            ),
+                        )
+
+                    # ---- RIGHT: inspector accordions ----
+                    with gr.Column(scale=1):
+                        with gr.Accordion("What the AI saw", open=False):
+                            ai_sent_md = gr.Markdown("_No message sent yet._")
+                            gr.Markdown("---")
+                            ai_raw_md = gr.Markdown("_No reply received yet._")
+                        with gr.Accordion("Usage", open=False):
+                            usage_detail_md = gr.Markdown("_No usage yet._")
+
+                reset_chat_btn = gr.Button(
+                    "Reset conversation", variant="secondary",
+                )
+
         gr.Markdown(
             "<p style='color:#94A3B8; font-size:0.85em; margin-top:2em; "
             "text-align:center;'>"
@@ -387,7 +806,14 @@ def build_app() -> gr.Blocks:
             inputs=[sample],
             outputs=[transcript, coach, client],
         )
-        redact_btn.click(
+        # Common "reset Tab 3 outputs" chain, used whenever Tab 1 or Tab 2
+        # re-runs (new context => stale chat).
+        reset_tab3_outputs = [
+            chat_display, chat_state, msg_input, counter_md,
+            ai_sent_md, ai_raw_md, usage_detail_md, persona_notice_md,
+        ]
+
+        redact_event = redact_btn.click(
             _on_redact,
             inputs=[transcript, coach, client, mode, state],
             outputs=[
@@ -400,12 +826,86 @@ def build_app() -> gr.Blocks:
                 usage_md,
                 raw_out,
                 rehydrated_out,
+                report_state,
             ],
         )
-        llm_btn.click(
+        redact_event.then(
+            _populate_moments,
+            inputs=[transcript],
+            outputs=[moment_dd, moment_lookup],
+        ).then(
+            _populate_starters,
+            inputs=[report_state],
+            outputs=[*starter_btns, starters_state],
+        ).then(
+            _readiness_update,
+            inputs=[state, report_state],
+            outputs=[readiness_md],
+        ).then(
+            _on_chat_reset,
+            outputs=reset_tab3_outputs,
+        )
+
+        llm_event = llm_btn.click(
             _on_llm_click,
             inputs=[state],
-            outputs=[usage_md, raw_out, rehydrated_out],
+            outputs=[usage_md, raw_out, rehydrated_out, report_state],
+        )
+        llm_event.then(
+            _populate_starters,
+            inputs=[report_state],
+            outputs=[*starter_btns, starters_state],
+        ).then(
+            _readiness_update,
+            inputs=[state, report_state],
+            outputs=[readiness_md],
+        ).then(
+            _on_chat_reset,
+            outputs=reset_tab3_outputs,
+        )
+
+        # ---------- Tab 3 events ----------
+        send_outputs = [
+            chat_display, chat_state, msg_input, counter_md,
+            ai_sent_md, ai_raw_md, usage_detail_md, persona_notice_md,
+        ]
+        send_inputs = [
+            msg_input, chat_display, chat_state,
+            state, report_state, coach, client, persona,
+        ]
+
+        send_btn.click(_on_send_from_input, inputs=send_inputs, outputs=send_outputs)
+        msg_input.submit(_on_send_from_input, inputs=send_inputs, outputs=send_outputs)
+
+        starter_inputs = [
+            starters_state, chat_display, chat_state,
+            state, report_state, coach, client, persona,
+        ]
+        for i, btn in enumerate(starter_btns):
+            btn.click(
+                _make_starter_handler(i),
+                inputs=starter_inputs,
+                outputs=send_outputs,
+            )
+
+        moment_dd.change(
+            _on_moment_select,
+            inputs=[moment_dd, moment_lookup],
+            outputs=[msg_input],
+        )
+
+        persona.change(
+            _on_persona_change,
+            inputs=[persona, chat_state],
+            outputs=[
+                persona_desc_md, persona_notice_md,
+                chat_display, chat_state, counter_md,
+            ],
+        )
+
+        reset_chat_btn.click(
+            _on_chat_reset,
+            outputs=reset_tab3_outputs,
         )
 
     return app
