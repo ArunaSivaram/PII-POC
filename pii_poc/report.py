@@ -2,9 +2,9 @@
 
 A stable intermediate shape keeps the chat feature (and anything else
 built on top of feedback) from depending on one particular report
-layout. The PoC's Gemini output, future richer prompts, and the
-external CoachBetter report format will all funnel into a
-`SessionReport` before they reach a downstream consumer.
+layout. The PoC's Gemini output, future richer prompts, and any
+external report format can all funnel into a `SessionReport` before
+they reach a downstream consumer.
 
 **All data here is in REDACTED form with placeholders.** The function
 contracts assume the transcript has been through `pii_poc.redactor.redact()`,
@@ -228,10 +228,10 @@ def from_poc_feedback(text: str) -> SessionReport:
     )
 
 
-def from_coachbetter_report(data: dict) -> SessionReport:
-    """Adapt the external CoachBetter report format into a SessionReport.
+def from_external_report(data: dict) -> SessionReport:
+    """Adapt an external report format into a SessionReport.
 
-    Not yet implemented — we'll fill this in once we have a sample of the
-    real report shape to map against.
+    Not yet implemented — we'll fill this in once we have a sample of
+    the real report shape to map against.
     """
-    raise NotImplementedError("Waiting for CoachBetter report sample")
+    raise NotImplementedError("External report adapter not implemented yet")

@@ -10,7 +10,7 @@ from pii_poc.report import (
     CompetencyResult,
     Evidence,
     SessionReport,
-    from_coachbetter_report,
+    from_external_report,
     from_poc_feedback,
     to_prompt_text,
 )
@@ -238,6 +238,9 @@ def test_from_poc_feedback_ignores_non_dict_competencies():
 # External adapter stub
 # ----------------------------------------------------------------------
 
-def test_from_coachbetter_report_not_implemented():
-    with pytest.raises(NotImplementedError, match="Waiting for CoachBetter report sample"):
-        from_coachbetter_report({})
+def test_from_external_report_not_implemented():
+    with pytest.raises(
+        NotImplementedError,
+        match="External report adapter not implemented yet",
+    ):
+        from_external_report({})

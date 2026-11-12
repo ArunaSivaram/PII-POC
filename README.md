@@ -1,5 +1,5 @@
 ---
-title: CoachBetter Privacy Shield PoC
+title: Privacy Shield for Coaching Transcripts
 emoji: 🛡️
 colorFrom: blue
 colorTo: indigo
@@ -10,7 +10,7 @@ python_version: "3.11"
 pinned: false
 ---
 
-# CoachBetter — Privacy Shield (proof of concept)
+# Privacy Shield for Coaching Transcripts (proof of concept)
 
 A small demo that redacts personal details in coaching session transcripts
 with consistent placeholders **before** an LLM sees the text, then swaps

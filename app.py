@@ -1,4 +1,4 @@
-"""CoachBetter — Privacy Shield (proof of concept).
+"""Privacy Shield for Coaching Transcripts (proof of concept).
 
 Three-tab Gradio UI for the PII redaction demo.
   * Redact        — load/paste a transcript, highlight detected PII by
@@ -610,7 +610,7 @@ SOFT_THEME = gr.themes.Soft(
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="CoachBetter — Privacy Shield") as app:
+    with gr.Blocks(title="Privacy Shield for Coaching Transcripts") as app:
 
         # Cross-tab state.
         # `state`              — RedactionResult from Tab 1
@@ -624,7 +624,7 @@ def build_app() -> gr.Blocks:
         moment_lookup = gr.State({})
         starters_state = gr.State([""] * 6)
 
-        gr.Markdown("# CoachBetter — Privacy Shield (proof of concept)")
+        gr.Markdown("# Privacy Shield for Coaching Transcripts (proof of concept)")
 
         with gr.Tabs():
             # ---------- Redact tab ----------
