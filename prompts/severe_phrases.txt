@@ -1,0 +1,55 @@
+# Phrases that trigger the SEVERE_RISK category.
+#
+# Format: category headers start with "## "; everything under a header
+# until the next header is a phrase. Comments start with "#". Blank
+# lines are ignored. Matching is case-insensitive and word-bounded, so
+# "hit me" matches but "hit me" inside "architect me" does not.
+#
+# The list is intentionally not exhaustive. The goal is NOT clinical
+# triage — it's a routing signal: "this transcript needs a human pair
+# of eyes before AI analysis". Over-detection is acceptable; the UI
+# offers a block-with-override.
+
+## self-harm
+suicide
+suicidal
+kill myself
+killing myself
+end it all
+want to die
+not want to be here
+self-harm
+self harm
+cut myself
+cutting myself
+overdose
+overdosed
+
+## interpersonal-violence
+rape
+raped
+sexual assault
+sexually assaulted
+molested
+molestation
+hit me
+hits me
+beat me
+beats me
+beaten up
+beaten me
+strangled me
+choked me
+domestic violence
+domestic abuse
+
+## child-harm
+child abuse
+childhood abuse
+abused as a child
+
+## substance-crisis
+blackout drunk
+can't stop drinking
+cant stop drinking
+drink myself to sleep

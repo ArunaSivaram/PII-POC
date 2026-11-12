@@ -128,6 +128,46 @@ Organisations (`ORGANIZATION`):
 
 ---
 
+---
+
+## samples/04_disclosure.txt
+
+### Should mask
+
+Coach / client:
+- `Dana Lewis` — coach ("Thank you, Dana.")
+- `Maria Santos` — client
+- Every stand-alone `Maria` → `[CLIENT_NAME]`
+
+People (`PERSON`):
+- `Marcus` — client's partner
+- `Anna` — client's sister (also a family-member reference)
+
+Organisations (`ORGANIZATION`):
+- `Oakwood Media`
+
+### Should NOT mask
+
+- Relationship / role words: `partner`, `sister`
+
+### Severe content (ALWAYS masked; blocks AI feedback unless overridden)
+
+- `hit me` (interpersonal-violence) in line [03:00] → `[REVIEW_1]`
+
+### Behaviour this sample demonstrates
+
+- The red banner on Tab 1 fires because SEVERE_RISK > 0.
+- Tab 2's "Get feedback from Gemini" button refuses to send until the
+  override checkbox is ticked. The redacted text sent on override has
+  `he [REVIEW_1] across the face` — Gemini never sees the specific
+  disclosure.
+- The transcript also shows a coach handling disclosure well
+  (naming it, offering referral, respecting boundaries), so chat
+  tab conversations about this session can discuss craft without
+  touching the clinical content.
+
+---
+
 ## Scoring notes
 
 - Case-insensitive match is expected for the `[COACH]` / `[CLIENT]` pseudo-ids

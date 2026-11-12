@@ -146,15 +146,34 @@ def _usage_from(response, model: str) -> Usage:
     )
 
 
-def get_icf_feedback(redacted_text: str) -> tuple[SessionReport, Usage]:
+# Extra instruction appended to the prompt when the coach has
+# explicitly overridden the severe-content block. Tells Gemini not to
+# engage with what any [REVIEW_N] placeholder contains.
+_SEVERE_OVERRIDE_INSTRUCTION = (
+    "This transcript contains one or more [REVIEW_N] placeholders that "
+    "mask content the coach has flagged as sensitive (self-harm, "
+    "violence, or similar). Do NOT attempt to interpret, speculate "
+    "about, or comment on what those placeholders contain. Limit your "
+    "feedback strictly to the coach's craft and ICF competencies around "
+    "how they navigated those moments."
+)
+
+
+def get_icf_feedback(
+    redacted_text: str,
+    *,
+    allow_severe: bool = False,
+) -> tuple[SessionReport, Usage]:
     """Send `redacted_text` to Gemini and return (SessionReport, Usage).
+
+    `allow_severe` is set by the caller when the user has explicitly
+    overridden the severe-content block — in that case we append a
+    guardrail instruction to the prompt so Gemini stays on coaching
+    craft and doesn't try to interpret the masked content.
 
     Raises `LLMConfigError` if the API key is missing. Other exceptions
     (network, quota, bad model name, etc.) propagate so the caller can
     render them.
-
-    On a parse failure, the returned `SessionReport` has empty
-    structured fields and `raw_text` carrying Gemini's literal reply.
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -165,10 +184,14 @@ def get_icf_feedback(redacted_text: str) -> tuple[SessionReport, Usage]:
 
     model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
 
+    prompt = _PROMPT
+    if allow_severe:
+        prompt = prompt + "\n\n" + _SEVERE_OVERRIDE_INSTRUCTION
+
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=model,
-        contents=f"{_PROMPT}\n\n--- Transcript ---\n{redacted_text}",
+        contents=f"{prompt}\n\n--- Transcript ---\n{redacted_text}",
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
         ),

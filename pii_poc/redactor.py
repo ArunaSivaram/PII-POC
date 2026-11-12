@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from pii_poc.recognizers import SUPPORTED_ENTITIES, build_analyzer
+from pii_poc.severe import detect_severe_spans
 
 
 # Country names kept unredacted even when LOCATION fires on them.
@@ -62,11 +63,16 @@ _PREFIX_OF = {
     "HEALTH":         "HEALTH",
     "FINANCE_AMOUNT": "AMOUNT",
     "BELIEF":         "BELIEF",
+    # Severe content — always masked regardless of sensitive_mode.
+    # The UI uses the count to decide whether to block the Gemini call.
+    "SEVERE_RISK":    "REVIEW",
 }
 
 # Which entity types are "sensitive content" (as opposed to identifying PII).
 # These are kept in `spans` for the UI to highlight, but in sensitive_mode
-# "flag" (default) they are NOT replaced in the redacted text.
+# "flag" (default) they are NOT replaced in the redacted text. Note:
+# SEVERE_RISK is deliberately NOT in this set — severe spans are always
+# masked so the exact disclosure never reaches the LLM, even on override.
 SENSITIVE_TOPIC_ENTITIES = {"HEALTH", "FINANCE_AMOUNT", "BELIEF"}
 
 
@@ -305,6 +311,20 @@ def redact(
         )
         for r in results
     ]
+
+    # 1b) Add SEVERE_RISK spans from the keyword/phrase matcher. These
+    #     run on the original text so they aren't affected by PII masking
+    #     and are always masked themselves (see SENSITIVE_TOPIC_ENTITIES
+    #     comment at the top of this file).
+    for s in detect_severe_spans(text):
+        spans.append(
+            DetectedSpan(
+                start=s.start,
+                end=s.end,
+                entity_type="SEVERE_RISK",
+                original=s.phrase,
+            )
+        )
 
     # 2) Drop country-level LOCATIONs.
     spans = [s for s in spans if not _is_country(s, text)]

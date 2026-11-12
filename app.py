@@ -62,6 +62,7 @@ _SAMPLES_DIR = Path(__file__).parent / "samples"
 # ----------------------------------------------------------------------
 _PII_BLUE = "#DBEAFE"         # blue-100  — soft, neutral
 _SENSITIVE_AMBER = "#FEF3C7"  # amber-100 — subtle warning
+_SEVERE_RED = "#FECACA"       # red-200   — needs reviewer attention
 
 COLOR_MAP = {
     # Masked PII
@@ -83,7 +84,50 @@ COLOR_MAP = {
     "HEALTH":         _SENSITIVE_AMBER,
     "FINANCE_AMOUNT": _SENSITIVE_AMBER,
     "BELIEF":         _SENSITIVE_AMBER,
+    # Severe content — always masked; red to flag "reviewer attention".
+    "SEVERE_RISK":    _SEVERE_RED,
 }
+
+
+# Placeholder-prefix → entity-type label (for colouring the Redacted
+# pane). We derive the prefix from the placeholder text, then look up
+# any representative entity type that shares the right colour.
+_PLACEHOLDER_PREFIX_TO_LABEL = {
+    "COACH_NAME":  "COACH",
+    "CLIENT_NAME": "CLIENT",
+    "PERSON":      "PERSON",
+    "ORG":         "ORGANIZATION",
+    "LOCATION":    "LOCATION",
+    "EMAIL":       "EMAIL_ADDRESS",
+    "PHONE":       "PHONE_NUMBER",
+    "DOB":         "DATE_OF_BIRTH",
+    "ID":          "SG_NRIC",      # all ID types share the blue
+    "HEALTH":      "HEALTH",
+    "AMOUNT":      "FINANCE_AMOUNT",
+    "BELIEF":      "BELIEF",
+    "REVIEW":      "SEVERE_RISK",
+}
+
+_PLACEHOLDER_SPAN_RE = re.compile(r"\[([A-Z]+(?:_[A-Z]+)*?)(?:_\d+)?\]")
+
+
+def _redacted_highlight_segments(redacted_text: str):
+    """Build (chunk, label) tuples for the Redacted pane so each
+    placeholder gets its PII/sensitive/severe colour."""
+    if not redacted_text:
+        return [("", None)]
+    segments: list[tuple[str, Optional[str]]] = []
+    cursor = 0
+    for m in _PLACEHOLDER_SPAN_RE.finditer(redacted_text):
+        if m.start() > cursor:
+            segments.append((redacted_text[cursor : m.start()], None))
+        prefix = m.group(1)
+        label = _PLACEHOLDER_PREFIX_TO_LABEL.get(prefix)
+        segments.append((redacted_text[m.start() : m.end()], label))
+        cursor = m.end()
+    if cursor < len(redacted_text):
+        segments.append((redacted_text[cursor:], None))
+    return segments
 
 
 # ----------------------------------------------------------------------
@@ -150,6 +194,7 @@ _SENSITIVE_GROUPS = [
     ("health flag",  "health flags",  ["HEALTH"]),
     ("finance flag", "finance flags", ["FINANCE_AMOUNT"]),
     ("belief flag",  "belief flags",  ["BELIEF"]),
+    ("severe span",  "severe spans",  ["SEVERE_RISK"]),
 ]
 
 
@@ -198,15 +243,19 @@ def _on_redact(
     if not transcript.strip():
         return (
             [("", None)],
-            "",
+            [("", None)],                          # Tab 1 redacted pane (HighlightedText)
             [],
             "_Paste or load a transcript first._",
+            gr.update(value="", visible=False),    # Tab 1 severe banner
             None,
-            "",    # Tab 2 preview
-            "",    # Tab 2 usage
-            "",    # Tab 2 raw output
-            "",    # Tab 2 rehydrated output
-            None,  # Tab 2 report state (SessionReport)
+            "",                                    # Tab 2 preview
+            gr.update(value="", visible=False),    # Tab 2 severe banner
+            gr.update(visible=False, value=False), # Tab 2 override checkbox
+            "",                                    # Tab 2 usage
+            "",                                    # Tab 2 raw output
+            "",                                    # Tab 2 rehydrated output
+            None,                                  # Tab 2 report state
+            gr.update(value="", visible=False),    # Tab 3 severe banner
         )
 
     mode = mode_label.lower()
@@ -230,20 +279,79 @@ def _on_redact(
 
     summary = _summarise(result.counts, result.seconds, mode)
 
+    redacted_segments = _redacted_highlight_segments(result.redacted_text)
+
+    severe_count = result.counts.get("SEVERE_RISK", 0)
+    if severe_count:
+        severe_update = gr.update(
+            value=(
+                "<div style='background:#FEE2E2;border:1px solid #FCA5A5;"
+                "border-radius:8px;padding:0.75em 1em;'>"
+                "<strong>⚠ Severe content detected</strong> &nbsp;·&nbsp; "
+                f"{severe_count} phrase"
+                f"{'s' if severe_count != 1 else ''} masked as "
+                "<code>[REVIEW_N]</code>. "
+                "The AI feedback on tab 2 is blocked by default — review the "
+                "ICF Code of Ethics on referral before proceeding."
+                "</div>"
+            ),
+            visible=True,
+        )
+    else:
+        severe_update = gr.update(value="", visible=False)
+
+    # Tab 2 severe-content UI: show banner + checkbox only when there
+    # are SEVERE_RISK spans. Checkbox always resets to unchecked so the
+    # coach confirms per redaction.
+    if severe_count:
+        tab2_banner = gr.update(
+            value=(
+                "<div style='background:#FEE2E2;border:1px solid #FCA5A5;"
+                "border-radius:8px;padding:0.75em 1em;'>"
+                "<strong>Severe content detected in this transcript.</strong> "
+                "The <em>Get feedback from Gemini</em> button will refuse to "
+                "send unless you confirm you've consulted a supervisor. "
+                "Masked content is never sent to Gemini either way."
+                "</div>"
+            ),
+            visible=True,
+        )
+        tab2_checkbox = gr.update(visible=True, value=False)
+        tab3_banner = gr.update(
+            value=(
+                "<div style='background:#FEE2E2;border:1px solid #FCA5A5;"
+                "border-radius:8px;padding:0.75em 1em;'>"
+                "<strong>This session contains severe-content flags.</strong> "
+                "The chat will discuss the coach's craft — it will not analyse "
+                "what was disclosed. Consider talking to a supervisor or "
+                "mentor coach."
+                "</div>"
+            ),
+            visible=True,
+        )
+    else:
+        tab2_banner = gr.update(value="", visible=False)
+        tab2_checkbox = gr.update(visible=False, value=False)
+        tab3_banner = gr.update(value="", visible=False)
+
     # Final values populate Tab 2's preview and clear any stale Gemini
     # output from a previous run, so Tab 2 always reflects the latest
     # redaction state.
     return (
         highlighted,
-        result.redacted_text,
+        redacted_segments,
         mapping_rows,
         summary,
+        severe_update,
         result,
-        result.redacted_text,  # Tab 2 preview
+        result.redacted_text,  # Tab 2 preview (plain text — unchanged)
+        tab2_banner,
+        tab2_checkbox,
         "",                    # Tab 2 usage (cleared)
         "",                    # Tab 2 raw output (cleared)
         "",                    # Tab 2 rehydrated output (cleared)
         None,                  # Tab 2 report state (cleared)
+        tab3_banner,
     )
 
 
@@ -270,13 +378,14 @@ def _render_report(report: SessionReport) -> str:
     return report.raw_text or "_(Gemini returned an empty response.)_"
 
 
-def _on_llm_click(state):
+def _on_llm_click(state, severe_override: bool):
     """Tab 2 button: send redacted text to Gemini, show usage + raw + rehydrated.
 
-    Returns a tuple that matches `outputs=[usage_md, raw_out,
-    rehydrated_out, report_state]`. Placeholders stay intact in the
-    report object (and in the left panel); only the right panel is
-    rehydrated to real names.
+    If the current RedactionResult contains SEVERE_RISK spans and the
+    coach has NOT ticked `severe_override`, we refuse to send and
+    render a block message instead. On override, `allow_severe=True`
+    is passed down so Gemini is told not to interpret the masked
+    [REVIEW_N] content.
     """
     if state is None or not getattr(state, "redacted_text", "").strip():
         msg = (
@@ -285,8 +394,26 @@ def _on_llm_click(state):
         )
         return "", msg, msg, None
 
+    severe_count = state.counts.get("SEVERE_RISK", 0) if state.counts else 0
+    if severe_count and not severe_override:
+        block_msg = (
+            "**AI feedback blocked.**\n\n"
+            f"This transcript contains **{severe_count}** span"
+            f"{'s' if severe_count != 1 else ''} the detector flagged as "
+            "severe (self-harm, violence, or similar). The ICF Code of "
+            "Ethics recommends talking to a supervisor or mentor coach "
+            "and/or considering a specialist referral before running AI "
+            "analysis over these moments.\n\n"
+            "If you've done that and still want craft-level feedback from "
+            "the AI, tick the checkbox above and press the button again."
+        )
+        return "", block_msg, block_msg, None
+
     try:
-        report, usage = get_icf_feedback(state.redacted_text)
+        report, usage = get_icf_feedback(
+            state.redacted_text,
+            allow_severe=bool(severe_count),
+        )
     except LLMConfigError as e:
         msg = (
             "**Can't call Gemini yet.**\n\n"
@@ -672,9 +799,11 @@ def build_app() -> gr.Blocks:
                 gr.Markdown(
                     "<p style='color:#64748B; font-size:0.85em; margin-top:0.5em;'>"
                     "Blue = masked personal detail &nbsp;·&nbsp; "
-                    "Amber = sensitive topic flagged for review"
+                    "Amber = sensitive topic flagged for review &nbsp;·&nbsp; "
+                    "Red = severe content, always masked &amp; blocked from AI"
                     "</p>"
                 )
+                severe_banner_md = gr.Markdown("", visible=False)
                 with gr.Row():
                     with gr.Column():
                         highlighted = gr.HighlightedText(
@@ -684,10 +813,11 @@ def build_app() -> gr.Blocks:
                             show_legend=False,
                         )
                     with gr.Column():
-                        redacted_out = gr.Textbox(
+                        redacted_out = gr.HighlightedText(
                             label="Redacted",
-                            lines=18,
-                            max_lines=40,
+                            color_map=COLOR_MAP,
+                            combine_adjacent=False,
+                            show_legend=False,
                         )
 
                 mapping_table = gr.Dataframe(
@@ -711,6 +841,16 @@ def build_app() -> gr.Blocks:
                     interactive=False,
                     placeholder="Run the Redact tab first — the redacted text will appear here.",
                 )
+                severe_tab2_banner_md = gr.Markdown("", visible=False)
+                severe_override_cb = gr.Checkbox(
+                    label=(
+                        "I've consulted a supervisor or mentor coach "
+                        "and understand the limits of AI feedback here. "
+                        "Enable the Gemini call."
+                    ),
+                    value=False,
+                    visible=False,
+                )
                 llm_btn = gr.Button(
                     "Get feedback from Gemini",
                     variant="primary",
@@ -732,6 +872,7 @@ def build_app() -> gr.Blocks:
                     "(tabs 1 and 2)._",
                     visible=True,
                 )
+                severe_tab3_banner_md = gr.Markdown("", visible=False)
 
                 with gr.Row():
                     persona = gr.Radio(
@@ -833,12 +974,16 @@ def build_app() -> gr.Blocks:
                 redacted_out,
                 mapping_table,
                 summary,
+                severe_banner_md,
                 state,
                 ai_input,
+                severe_tab2_banner_md,
+                severe_override_cb,
                 usage_md,
                 raw_out,
                 rehydrated_out,
                 report_state,
+                severe_tab3_banner_md,
             ],
         )
         redact_event.then(
@@ -860,7 +1005,7 @@ def build_app() -> gr.Blocks:
 
         llm_event = llm_btn.click(
             _on_llm_click,
-            inputs=[state],
+            inputs=[state, severe_override_cb],
             outputs=[usage_md, raw_out, rehydrated_out, report_state],
         )
         llm_event.then(
