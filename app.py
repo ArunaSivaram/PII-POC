@@ -54,29 +54,35 @@ _SAMPLES_DIR = Path(__file__).parent / "samples"
 
 
 # ----------------------------------------------------------------------
-# Visual palette — soft pastels grouped by meaning.
-# Brighter blue for the primary participants (coach/client), paler blues
-# for other people, warmer colours for identifiers, pink/amber/grey for
-# sensitive-topic flags so reviewers can scan them at a glance.
+# Two-tone palette:
+#   - Blue  — all PII entities (the stuff that gets masked to placeholders)
+#   - Amber — sensitive-topic flags (the stuff a coach should review)
+# One colour per role keeps the transcript calm and legible. Hover still
+# reveals the specific entity label via the HighlightedText tooltip.
 # ----------------------------------------------------------------------
+_PII_BLUE = "#DBEAFE"         # blue-100  — soft, neutral
+_SENSITIVE_AMBER = "#FEF3C7"  # amber-100 — subtle warning
+
 COLOR_MAP = {
-    "COACH":          "#60A5FA",  # blue-400
-    "CLIENT":         "#60A5FA",
-    "PERSON":         "#BFDBFE",  # blue-200
-    "FAMILY_MEMBER":  "#BFDBFE",
-    "ORGANIZATION":   "#DDD6FE",  # violet-200
-    "LOCATION":       "#BBF7D0",  # green-200
-    "EMAIL_ADDRESS":  "#A5F3FC",  # cyan-200
-    "PHONE_NUMBER":   "#FED7AA",  # orange-200
-    "DATE_OF_BIRTH":  "#FECACA",  # red-200
-    "SG_NRIC":        "#FCA5A5",  # red-300
-    "IN_AADHAAR":     "#FCA5A5",
-    "IN_PAN":         "#FCA5A5",
-    "BANK_ACCOUNT":   "#FCA5A5",
-    "CREDIT_CARD":    "#FCA5A5",
-    "HEALTH":         "#FBCFE8",  # pink-200  (sensitive topic)
-    "FINANCE_AMOUNT": "#FEF08A",  # yellow-200 (sensitive topic)
-    "BELIEF":         "#E5E7EB",  # gray-200   (sensitive topic)
+    # Masked PII
+    "COACH":          _PII_BLUE,
+    "CLIENT":         _PII_BLUE,
+    "PERSON":         _PII_BLUE,
+    "FAMILY_MEMBER":  _PII_BLUE,
+    "ORGANIZATION":   _PII_BLUE,
+    "LOCATION":       _PII_BLUE,
+    "EMAIL_ADDRESS":  _PII_BLUE,
+    "PHONE_NUMBER":   _PII_BLUE,
+    "DATE_OF_BIRTH":  _PII_BLUE,
+    "SG_NRIC":        _PII_BLUE,
+    "IN_AADHAAR":     _PII_BLUE,
+    "IN_PAN":         _PII_BLUE,
+    "BANK_ACCOUNT":   _PII_BLUE,
+    "CREDIT_CARD":    _PII_BLUE,
+    # Sensitive topics (flagged or masked depending on mode)
+    "HEALTH":         _SENSITIVE_AMBER,
+    "FINANCE_AMOUNT": _SENSITIVE_AMBER,
+    "BELIEF":         _SENSITIVE_AMBER,
 }
 
 
@@ -663,13 +669,19 @@ def build_app() -> gr.Blocks:
 
                 summary = gr.Markdown("")
 
+                gr.Markdown(
+                    "<p style='color:#64748B; font-size:0.85em; margin-top:0.5em;'>"
+                    "Blue = masked personal detail &nbsp;·&nbsp; "
+                    "Amber = sensitive topic flagged for review"
+                    "</p>"
+                )
                 with gr.Row():
                     with gr.Column():
                         highlighted = gr.HighlightedText(
                             label="Original (highlighted)",
                             color_map=COLOR_MAP,
                             combine_adjacent=False,
-                            show_legend=True,
+                            show_legend=False,
                         )
                     with gr.Column():
                         redacted_out = gr.Textbox(
